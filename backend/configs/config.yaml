@@ -1,0 +1,119 @@
+# AI-Driven Anomaly Detection — Master Configuration
+random_seed: 42
+
+database:
+  url: "sqlite:///./data/burnin.db"
+
+dataset:
+  num_lots: 15
+  components_per_lot_min: 40
+  components_per_lot_max: 80
+  missing_measurement_fraction: 0.03
+  duplicate_fraction: 0.005
+  invalid_fraction: 0.002
+  output_dir: "data/synthetic"
+  output_format: "csv"
+
+parameters:
+  iddq:
+    spec_min: 0.1
+    spec_max: 5.0
+    unit: "mA"
+    lot_baseline_mean: 1.5
+    lot_baseline_std: 0.3
+  leakage_current:
+    spec_min: 0.0
+    spec_max: 50.0
+    unit: "uA"
+    lot_baseline_mean: 10.0
+    lot_baseline_std: 3.0
+  propagation_delay:
+    spec_min: 1.0
+    spec_max: 15.0
+    unit: "ns"
+    lot_baseline_mean: 5.0
+    lot_baseline_std: 1.0
+
+label_distribution:
+  healthy: 0.70
+  static_fail: 0.05
+  latent_defect: 0.08
+  gradual_drift: 0.07
+  sudden_drift: 0.05
+  noisy_healthy: 0.05
+
+module_a:
+  mad_z_threshold: 3.0
+  isolation_forest_contamination: 0.12
+  isolation_forest_n_estimators: 200
+  score_weights:
+    mad: 0.45
+    isolation_forest: 0.35
+    xgb: 0.20
+  anomaly_threshold: 0.45
+  xgb_threshold: 0.30
+  xgb_n_estimators: 300
+  xgb_max_depth: 6
+  xgb_learning_rate: 0.05
+  use_xgb_classifier: true
+  severity_bands:
+    low: 0.30
+    medium: 0.50
+    high: 0.70
+
+module_b:
+  use_value_96h: true
+  cv_folds: 5
+  candidate_models:
+    - linear_regression
+    - ridge
+    - random_forest
+    - xgboost_regressor
+    - gradient_boosting
+  ridge_alpha: 1.0
+  random_forest:
+    n_estimators: 200
+    max_depth: 10
+  xgboost_regressor:
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+  gradient_boosting:
+    n_estimators: 200
+    max_depth: 5
+    learning_rate: 0.05
+  drift_risk_thresholds:
+    safe: 0.5
+    watch: 0.85
+  drift_convention: "from_24h"
+
+safety_slope:
+  healthy_percentile: 95
+  horizon_hours: 168
+  use_spec_headroom: true
+  spec_headroom_fraction: 0.8
+
+decision_rules_file: "configs/decision_rules.yaml"
+
+evaluation:
+  test_fraction: 0.20
+  val_fraction: 0.15
+  split_by_lot: true
+
+demo:
+  seed: 12345
+  components:
+    - id: "C001"
+      label: "healthy"
+    - id: "C002"
+      label: "static_fail"
+    - id: "C003"
+      label: "latent_defect"
+    - id: "C004"
+      label: "gradual_drift"
+    - id: "C005"
+      label: "sudden_drift"
+    - id: "C006"
+      label: "noisy_healthy"

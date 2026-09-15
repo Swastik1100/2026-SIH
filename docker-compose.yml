@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: burnsight-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist generated data and trained models between restarts
+      - ./backend/data:/app/data
+      - ./backend/models:/app/models
+    environment:
+      - DATABASE_URL=sqlite:///./data/burnin.db
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s  # Allow time for pipeline to run on first boot
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Point the frontend build to the backend service
+        # In Docker network, backend is accessible at http://backend:8000
+        # For browser access (public-facing), this should be http://localhost:8000
+        VITE_API_URL: http://localhost:8000
+    container_name: burnsight-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  default:
+    name: burnsight-network

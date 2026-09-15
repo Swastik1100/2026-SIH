@@ -1,0 +1,1 @@
+{"mad_z_threshold": 3.0, "isolation_forest_contamination": 0.12, "isolation_forest_n_estimators": 200, "score_weights": {"mad": 0.45, "isolation_forest": 0.35, "xgb": 0.2}, "anomaly_threshold": 0.45, "xgb_threshold": 0.3, "xgb_n_estimators": 300, "xgb_max_depth": 6, "xgb_learning_rate": 0.05, "use_xgb_classifier": true, "severity_bands": {"low": 0.3, "medium": 0.5, "high": 0.7}}

@@ -1,0 +1,76 @@
+# Transparent decision rules — editable without code changes
+# Inputs: static_result, anomaly_severity, drift_risk, safety_margin_pct, confidence
+
+rules:
+  - name: "Static fail → REJECT"
+    priority: 1
+    conditions:
+      static_result: "FAIL"
+    decision: "REJECT"
+    reason: "Component exceeds absolute specification limits."
+
+  - name: "High anomaly + dangerous drift → REJECT"
+    priority: 2
+    conditions:
+      static_result: "PASS"
+      anomaly_severity: "HIGH"
+      drift_risk: "DANGEROUS"
+    decision: "REJECT"
+    reason: "Static pass but high population anomaly and dangerous predicted drift."
+
+  - name: "High anomaly + watch drift → REVIEW"
+    priority: 3
+    conditions:
+      static_result: "PASS"
+      anomaly_severity: "HIGH"
+      drift_risk: "WATCH"
+    decision: "REVIEW"
+    reason: "High anomaly with elevated drift — requires QA review."
+
+  - name: "Medium anomaly + dangerous drift → REVIEW"
+    priority: 4
+    conditions:
+      static_result: "PASS"
+      anomaly_severity: "MEDIUM"
+      drift_risk: "DANGEROUS"
+    decision: "REVIEW"
+    reason: "Moderate anomaly combined with dangerous drift trajectory."
+
+  - name: "Medium anomaly only → WATCH"
+    priority: 5
+    conditions:
+      static_result: "PASS"
+      anomaly_severity: "MEDIUM"
+      drift_risk: "SAFE"
+    decision: "WATCH"
+    reason: "Moderate dynamic anomaly detected; monitor closely."
+
+  - name: "Dangerous drift only → REVIEW"
+    priority: 6
+    conditions:
+      static_result: "PASS"
+      anomaly_severity: "LOW"
+      drift_risk: "DANGEROUS"
+    decision: "REVIEW"
+    reason: "Predicted drift exceeds safety slope despite low anomaly score."
+
+  - name: "Watch drift only → WATCH"
+    priority: 7
+    conditions:
+      static_result: "PASS"
+      anomaly_severity: "LOW"
+      drift_risk: "WATCH"
+    decision: "WATCH"
+    reason: "Drift trajectory warrants monitoring."
+
+  - name: "All clear → PASS"
+    priority: 99
+    conditions:
+      static_result: "PASS"
+      anomaly_severity: "LOW"
+      drift_risk: "SAFE"
+    decision: "PASS"
+    reason: "Within specification and no significant anomaly or drift detected."
+
+default_decision: "REVIEW"
+default_reason: "Mixed signals — manual QA review recommended."

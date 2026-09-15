@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Data & models (keep structure, ignore large generated)
+backend/data/raw/*.csv
+backend/data/raw/*.parquet
+backend/data/processed/*.csv
+backend/data/processed/*.parquet
+backend/data/synthetic/*.csv
+backend/data/synthetic/*.parquet
+!backend/data/raw/.gitkeep
+!backend/data/processed/.gitkeep
+!backend/data/synthetic/.gitkeep
+
+# Database
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Logs
+*.log

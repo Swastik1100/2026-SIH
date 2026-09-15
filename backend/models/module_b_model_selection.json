@@ -1,0 +1,74 @@
+{
+  "iddq": {
+    "linear_regression": {
+      "mae": 0.310518,
+      "rmse": 0.532869
+    },
+    "ridge": {
+      "mae": 0.3704,
+      "rmse": 0.614134
+    },
+    "random_forest": {
+      "mae": 0.247966,
+      "rmse": 0.489856
+    },
+    "xgboost_regressor": {
+      "mae": 0.264875,
+      "rmse": 0.510157
+    },
+    "gradient_boosting": {
+      "mae": 0.270737,
+      "rmse": 0.519567
+    },
+    "selected": "random_forest",
+    "selected_mae": 0.247966
+  },
+  "leakage_current": {
+    "linear_regression": {
+      "mae": 3.728014,
+      "rmse": 6.544115
+    },
+    "ridge": {
+      "mae": 3.502206,
+      "rmse": 6.504963
+    },
+    "random_forest": {
+      "mae": 3.244241,
+      "rmse": 6.223153
+    },
+    "xgboost_regressor": {
+      "mae": 3.495778,
+      "rmse": 6.538866
+    },
+    "gradient_boosting": {
+      "mae": 3.539337,
+      "rmse": 6.922715
+    },
+    "selected": "random_forest",
+    "selected_mae": 3.244241
+  },
+  "propagation_delay": {
+    "linear_regression": {
+      "mae": 0.98009,
+      "rmse": 1.592071
+    },
+    "ridge": {
+      "mae": 0.923985,
+      "rmse": 1.52646
+    },
+    "random_forest": {
+      "mae": 0.707613,
+      "rmse": 1.311906
+    },
+    "xgboost_regressor": {
+      "mae": 0.803151,
+      "rmse": 1.389282
+    },
+    "gradient_boosting": {
+      "mae": 0.814488,
+      "rmse": 1.451716
+    },
+    "selected": "random_forest",
+    "selected_mae": 0.707613
+  }
+}
