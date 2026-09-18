@@ -53,7 +53,7 @@ export default function LotAnalysis() {
         getScreeningResults(),
       ]);
       setSummary(s);
-      const lotComps = all.filter(r => r.lot_id === lid.trim());
+      const lotComps = all.records.filter((r: any) => r.lot_id === lid.trim());
       setComponents(lotComps);
       if (s.parameters[0]) setSelectedParam(s.parameters[0]);
       navigate(`/lots/${lid.trim()}`, { replace: true });

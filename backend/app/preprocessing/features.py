@@ -131,22 +131,54 @@ def engineer_features(
     df["margin_to_spec_max"] = df["spec_max"] - df[["value_0h", "value_24h", "value_96h"]].max(axis=1)
     df["margin_to_spec_min"] = df[["value_0h", "value_24h", "value_96h"]].min(axis=1) - df["spec_min"]
 
+    # --- Vectorized lot-stats lookup (replaces iterrows loop) ---
+    # Build a lookup DataFrame from the lot_stats dict
+    if lot_stats:
+        stats_records = [
+            {"lot_id": lot, "parameter": param, "checkpoint": ckpt, "_median": med, "_mad": mad}
+            for (lot, param, ckpt), (med, mad) in lot_stats.items()
+        ]
+        stats_df = pd.DataFrame(stats_records)
+    else:
+        stats_df = pd.DataFrame(columns=["lot_id", "parameter", "checkpoint", "_median", "_mad"])
+
     for checkpoint in ["value_0h", "value_24h", "value_96h"]:
         suffix = checkpoint.replace("value_", "")
-        medians, mads, zscores = [], [], []
-        for _, row in df.iterrows():
-            key = (row["lot_id"], row["parameter"], checkpoint)
-            if key in lot_stats:
-                med, mad = lot_stats[key]
-            else:
-                gkey = ("__global__", row["parameter"], checkpoint)
-                med, mad = lot_stats.get(gkey, (np.nan, 1e-6))
-            medians.append(med)
-            mads.append(mad)
-            zscores.append(_robust_z(row[checkpoint], med, mad) if pd.notna(row[checkpoint]) else 0.0)
-        df[f"lot_median_{suffix}"] = medians
-        df[f"lot_mad_{suffix}"] = mads
-        df[f"robust_z_{suffix}"] = zscores
+
+        # Lot-level stats
+        lot_stats_ckpt = stats_df[stats_df["checkpoint"] == checkpoint][
+            ["lot_id", "parameter", "_median", "_mad"]
+        ].rename(columns={"_median": f"lot_median_{suffix}", "_mad": f"lot_mad_{suffix}"})
+
+        # Global fallback stats (lot_id == '__global__')
+        global_stats_ckpt = stats_df[
+            (stats_df["checkpoint"] == checkpoint) & (stats_df["lot_id"] == "__global__")
+        ][["parameter", "_median", "_mad"]].rename(
+            columns={"_median": f"_gmed_{suffix}", "_mad": f"_gmad_{suffix}"}
+        )
+
+        # Merge lot-level stats
+        df = df.merge(lot_stats_ckpt, on=["lot_id", "parameter"], how="left")
+
+        # Merge global fallback
+        df = df.merge(global_stats_ckpt, on="parameter", how="left")
+
+        # Fill missing lot stats with global fallback
+        df[f"lot_median_{suffix}"] = df[f"lot_median_{suffix}"].fillna(df[f"_gmed_{suffix}"]).fillna(np.nan)
+        df[f"lot_mad_{suffix}"] = df[f"lot_mad_{suffix}"].fillna(df[f"_gmad_{suffix}"].fillna(1e-6))
+
+        # Drop temporary global columns
+        df.drop(columns=[f"_gmed_{suffix}", f"_gmad_{suffix}"], inplace=True)
+
+        # Compute robust z-score vectorized
+        val_col = df[checkpoint]
+        med_col = df[f"lot_median_{suffix}"]
+        mad_col = df[f"lot_mad_{suffix}"]
+        df[f"robust_z_{suffix}"] = np.where(
+            val_col.notna() & (mad_col > 1e-12),
+            0.6745 * (val_col - med_col) / mad_col,
+            0.0,
+        )
 
     return df
 

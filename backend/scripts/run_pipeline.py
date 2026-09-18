@@ -8,7 +8,13 @@ from pathlib import Path
 
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# Ensure the backend directory and scripts directory are on the path
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from app.core.config import get_config
 from app.data.generator import generate_dataset, generate_demo_components
@@ -51,8 +57,8 @@ def main():
     pipeline.screen_dataframe(demo_df, persist=True)
 
     # Run evaluation
-    from scripts.evaluate import run_evaluation
-    from scripts.compare_baselines import run_baseline_comparison
+    from evaluate import run_evaluation
+    from compare_baselines import run_baseline_comparison
 
     run_evaluation(pipeline, df)
     run_baseline_comparison(pipeline, df)

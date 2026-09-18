@@ -20,6 +20,8 @@ export interface AnomalyResult {
   anomaly_score: number;
   anomaly_label: boolean;
   severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  xgb_score: number;
+  xgb_triggered: boolean;
   contributing_features: string[];
 }
 
@@ -77,13 +79,20 @@ export interface ScreeningRecord {
   component_id: string;
   lot_id: string;
   parameter: string;
-  static_result: string;
+  static_result: 'PASS' | 'FAIL';
   anomaly_score: number | null;
   predicted_168h: number | null;
-  drift_risk: string | null;
-  final_decision: string | null;
+  drift_risk: 'SAFE' | 'WATCH' | 'DANGEROUS' | null;
+  final_decision: 'PASS' | 'WATCH' | 'REVIEW' | 'REJECT' | null;
   explanation: string | null;
   label?: string | null;
+}
+
+export interface PaginatedScreeningResults {
+  total: number;
+  page: number;
+  page_size: number;
+  records: ScreeningRecord[];
 }
 
 export interface ComponentDetail {
@@ -159,14 +168,24 @@ export interface BaselineStats {
 
 // ── API Functions ──────────────────────────────────────────────────────
 
-export const healthCheck = () =>
+export const health = () =>
   api.get<{ status: string; version: string }>('/health').then(r => r.data);
+
+/** @deprecated Use health() instead */
+export const healthCheck = health;
 
 export const getDashboardStats = () =>
   api.get<DashboardStats>('/dashboard-stats').then(r => r.data);
 
-export const getScreeningResults = () =>
-  api.get<ScreeningRecord[]>('/screening-results').then(r => r.data);
+export const getScreeningResults = (
+  page = 1,
+  pageSize = 100,
+  decision?: string,
+) => {
+  const params: Record<string, unknown> = { page, page_size: pageSize };
+  if (decision) params.decision = decision;
+  return api.get<PaginatedScreeningResults>('/screening-results', { params }).then(r => r.data);
+};
 
 export const getComponentDetail = (id: string) =>
   api.get<ComponentDetail>(`/component/${id}`).then(r => r.data);

@@ -22,18 +22,23 @@ def explain_component(
     parts.append(f"Component {cid} (Lot {lot}, Parameter: {param.replace('_', ' ')}):")
 
     # Static limit
-    val_168 = row.get("value_168h") or row.get("value_96h") or row.get("value_24h")
+    val_168 = (
+        row.get("value_168h") if row.get("value_168h") is not None
+        else row.get("value_96h") if row.get("value_96h") is not None
+        else row.get("value_24h")
+    )
     spec_max = row.get("spec_max")
     spec_min = row.get("spec_min")
     static = decision.get("static_result", "PASS")
+    val_str = f"{val_168:.2f} {unit}" if val_168 is not None else "N/A"
     if static == "FAIL":
         parts.append(
-            f"STATIC LIMIT FAIL: measured {val_168:.2f} {unit} exceeds "
+            f"STATIC LIMIT FAIL: measured {val_str} exceeds "
             f"spec range [{spec_min}, {spec_max}] {unit}."
         )
     else:
         parts.append(
-            f"Static screening PASS: value {val_168:.2f} {unit} is within "
+            f"Static screening PASS: value {val_str} is within "
             f"spec limits [{spec_min}, {spec_max}] {unit}."
         )
 
@@ -75,10 +80,15 @@ def explain_component(
 def explain_summary_for_demo(row: dict[str, Any], anomaly: dict, drift: dict, decision: dict) -> str:
     """Short headline for C003 demo."""
     if row.get("component_id") == "C003" and row.get("parameter") == "leakage_current":
+        v168 = row.get("value_168h", 45.1)
+        spec_max = row.get("spec_max", 50.0)
+        lot_med = row.get("lot_median_96h") or row.get("lot_median_24h") or row.get("lot_median_0h", 10.0)
+        unit_map = {"iddq": "mA", "leakage_current": "µA", "propagation_delay": "ns"}
+        unit = unit_map.get(row.get("parameter", ""), "")
         return (
-            f"HEADLINE: Component C003 PASSED static screening (45.1 µA < 50 µA limit) "
+            f"HEADLINE: Component C003 PASSED static screening ({v168:.1f} {unit} < {spec_max:.0f} {unit} limit) "
             f"but flagged as {anomaly.get('severity')} dynamic anomaly "
-            f"(lot median ≈ 10 µA, z-score >> 3.5) with {drift.get('drift_risk')} drift. "
+            f"(lot median ≈ {lot_med:.1f} {unit}, z-score >> 3.5) with {drift.get('drift_risk')} drift. "
             f"Decision: {decision.get('decision')}."
         )
     return explain_component(row, anomaly, drift, decision, {})

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 
-from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, Text, create_engine
+from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, Text, UniqueConstraint, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import get_config
@@ -18,6 +18,9 @@ class Base(DeclarativeBase):
 
 class ScreeningResult(Base):
     __tablename__ = "screening_results"
+    __table_args__ = (
+        UniqueConstraint("component_id", "parameter", name="uq_component_parameter"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     component_id = Column(String(64), index=True, nullable=False)
@@ -39,7 +42,7 @@ class ScreeningResult(Base):
     explanation = Column(Text)
     label = Column(String(32))
     extra = Column(JSON)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 _engine = None
@@ -59,7 +62,9 @@ def get_engine():
             if parent_dir and not parent_dir.exists():
                 os.makedirs(parent_dir, exist_ok=True)
 
-        _engine = create_engine(db_url, connect_args={"check_same_thread": False})
+        # check_same_thread is SQLite-specific; must not be passed to other engines
+        connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
+        _engine = create_engine(db_url, connect_args=connect_args)
     return _engine
 
 
@@ -80,5 +85,8 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

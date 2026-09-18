@@ -189,7 +189,7 @@ class TestImputeMissing:
         })
         cleaned, log = impute_missing(df)
         assert len(log) >= 1
-        assert cleaned.iloc[0]["was_imputed"] is True
+        assert bool(cleaned.iloc[0]["was_imputed"]) is True
 
 
 class TestCleanDataset:

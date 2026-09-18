@@ -44,7 +44,9 @@ def _trajectory_static_fail(
     if rng.random() < 0.5:
         values[fail_at] = spec_max * rng.uniform(1.05, 1.3)
     else:
-        values[fail_at] = spec_min * rng.uniform(0.5, 0.95)
+        # For parameters with spec_min=0 (e.g. leakage_current), offset below zero
+        offset = max(abs(spec_min) * 0.5, 0.5)
+        values[fail_at] = spec_min - rng.uniform(offset * 0.5, offset * 1.5)
     return values
 
 

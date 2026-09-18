@@ -1,60 +1,94 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getScreeningResults } from '../api/client';
-import type { ScreeningRecord } from '../api/client';
+import type { ScreeningRecord, PaginatedScreeningResults } from '../api/client';
 
+const DECISIONS = ['PASS', 'WATCH', 'REVIEW', 'REJECT'] as const;
+const DECISION_COLOR: Record<string, string> = {
+  PASS: 'pass', WATCH: 'watch', REVIEW: 'review', REJECT: 'reject',
+};
 
 function decisionClass(d: string) {
-  const m: Record<string, string> = { PASS: 'badge-pass', WATCH: 'badge-watch', REVIEW: 'badge-review', REJECT: 'badge-reject' };
-  return `badge ${m[d] || 'badge-watch'}`;
+  return `badge badge-${DECISION_COLOR[d] || 'watch'}`;
 }
 
 function driftClass(d: string) {
   return `badge badge-${d === 'DANGEROUS' ? 'dangerous' : d === 'WATCH' ? 'watch-drift' : 'safe'}`;
 }
 
-type SortKey = keyof ScreeningRecord | 'none';
+type SortKey = keyof ScreeningRecord;
+
+const SERVER_PAGE_SIZE = 500; // Fetch large pages from server, paginate client-side
 
 export default function ScreeningResults() {
   const navigate = useNavigate();
-  const [records, setRecords] = useState<ScreeningRecord[]>([]);
+
+  // Server data
+  const [serverData, setServerData] = useState<PaginatedScreeningResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterDecision, setFilterDecision] = useState('');
+
+  // Client-side filters (applied on top of server data)
   const [filterParam, setFilterParam] = useState('');
   const [filterDrift, setFilterDrift] = useState('');
+  const [filterDecision, setFilterDecision] = useState('');
   const [searchId, setSearchId] = useState('');
+
+  // Sorting
   const [sortKey, setSortKey] = useState<SortKey>('anomaly_score');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  // Client-side pagination
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
 
-  useEffect(() => {
-    getScreeningResults()
-      .then(setRecords)
+  const fetchData = useCallback((decision?: string) => {
+    setLoading(true);
+    setError(null);
+    getScreeningResults(1, SERVER_PAGE_SIZE, decision)
+      .then(data => { setServerData(data); setPage(0); })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const records = serverData?.records ?? [];
+  const serverTotal = serverData?.total ?? 0;
+
+  // Available parameter options from current loaded records
+  const params = useMemo(() => [...new Set(records.map(r => r.parameter))], [records]);
+
+  // Client-side filter + sort
   const filtered = useMemo(() => {
     let r = records;
     if (filterDecision) r = r.filter(x => x.final_decision === filterDecision);
     if (filterParam) r = r.filter(x => x.parameter === filterParam);
     if (filterDrift) r = r.filter(x => x.drift_risk === filterDrift);
-    if (searchId) r = r.filter(x => x.component_id.toLowerCase().includes(searchId.toLowerCase()) || x.lot_id.toLowerCase().includes(searchId.toLowerCase()));
-    if (sortKey !== 'none') {
-      r = [...r].sort((a, b) => {
-        const av = a[sortKey as keyof ScreeningRecord] ?? (sortDir === 'asc' ? Infinity : -Infinity);
-        const bv = b[sortKey as keyof ScreeningRecord] ?? (sortDir === 'asc' ? Infinity : -Infinity);
-        if (typeof av === 'number' && typeof bv === 'number') return sortDir === 'asc' ? av - bv : bv - av;
-        return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-      });
-    }
-    return r;
+    if (searchId) r = r.filter(x =>
+      x.component_id.toLowerCase().includes(searchId.toLowerCase()) ||
+      x.lot_id.toLowerCase().includes(searchId.toLowerCase())
+    );
+    return [...r].sort((a, b) => {
+      const av = a[sortKey] ?? (sortDir === 'asc' ? Infinity : -Infinity);
+      const bv = b[sortKey] ?? (sortDir === 'asc' ? Infinity : -Infinity);
+      if (typeof av === 'number' && typeof bv === 'number') return sortDir === 'asc' ? av - bv : bv - av;
+      return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    });
   }, [records, filterDecision, filterParam, filterDrift, searchId, sortKey, sortDir]);
 
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+
+  // Decision counts from current loaded data
+  const counts = useMemo(() =>
+    records.reduce((acc, r) => {
+      const d = r.final_decision || 'UNKNOWN';
+      acc[d] = (acc[d] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+    [records]
+  );
 
   const handleSort = (key: SortKey) => {
     if (key === sortKey) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -65,45 +99,62 @@ export default function ScreeningResults() {
   const sortIndicator = (key: SortKey) =>
     sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ⇅';
 
-  const params = [...new Set(records.map(r => r.parameter))];
+  const handleDecisionFilter = (d: string) => {
+    const next = filterDecision === d ? '' : d;
+    setFilterDecision(next);
+    setPage(0);
+  };
 
-  // Summary counts
-  const counts = records.reduce((acc, r) => {
-    const d = r.final_decision || 'UNKNOWN';
-    acc[d] = (acc[d] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const clearFilters = () => {
+    setFilterDecision('');
+    setFilterParam('');
+    setFilterDrift('');
+    setSearchId('');
+    setPage(0);
+  };
+
+  const hasFilters = !!(filterDecision || filterParam || filterDrift || searchId);
 
   return (
     <div className="page-content animate-fade-in">
       <div className="page-header">
         <div className="page-header-eyebrow">Results</div>
         <h1>Screening Results</h1>
-        <p>All screened components with their anomaly scores, drift predictions, and final AI decisions. Sortable and filterable.</p>
+        <p>
+          All screened components with anomaly scores, drift predictions, and AI decisions.
+          {serverTotal > records.length && (
+            <span style={{ color: 'var(--color-amber)', marginLeft: '0.5rem' }}>
+              ⚠ Showing {records.length.toLocaleString()} of {serverTotal.toLocaleString()} total records.
+            </span>
+          )}
+        </p>
       </div>
 
-      {/* Summary bar */}
+      {/* Summary bar — click to filter by decision */}
       <div className="stats-grid animate-fade-in-delay-1" style={{ gridTemplateColumns: 'repeat(5, 1fr)', marginBottom: 'var(--space-6)' }}>
-        {['PASS', 'WATCH', 'REVIEW', 'REJECT'].map(d => (
+        {DECISIONS.map(d => (
           <div
             key={d}
             className="stat-card"
             style={{
-              '--accent-color': `var(--color-${d === 'PASS' ? 'pass' : d === 'WATCH' ? 'watch' : d === 'REVIEW' ? 'review' : 'reject'})`,
+              '--accent-color': `var(--color-${DECISION_COLOR[d]})`,
               cursor: 'pointer',
-              borderColor: filterDecision === d ? `var(--color-${d === 'PASS' ? 'pass' : d === 'WATCH' ? 'watch' : d === 'REVIEW' ? 'review' : 'reject'})` : undefined,
+              borderColor: filterDecision === d ? `var(--color-${DECISION_COLOR[d]})` : undefined,
+              outline: filterDecision === d ? `1px solid var(--color-${DECISION_COLOR[d]})` : undefined,
             } as React.CSSProperties}
-            onClick={() => { setFilterDecision(filterDecision === d ? '' : d); setPage(0); }}
+            onClick={() => handleDecisionFilter(d)}
           >
             <div className="stat-label">{d}</div>
-            <div className="stat-value" style={{ color: `var(--color-${d === 'PASS' ? 'pass' : d === 'WATCH' ? 'watch' : d === 'REVIEW' ? 'review' : 'reject'})`, fontSize: '1.5rem' }}>
-              {counts[d] || 0}
+            <div className="stat-value" style={{ color: `var(--color-${DECISION_COLOR[d]})`, fontSize: '1.5rem' }}>
+              {loading ? '–' : (counts[d] || 0).toLocaleString()}
             </div>
           </div>
         ))}
         <div className="stat-card" style={{ '--accent-color': 'var(--color-blue)' } as React.CSSProperties}>
-          <div className="stat-label">Total Records</div>
-          <div className="stat-value" style={{ fontSize: '1.5rem' }}>{records.length.toLocaleString()}</div>
+          <div className="stat-label">Total Loaded</div>
+          <div className="stat-value" style={{ fontSize: '1.5rem' }}>
+            {loading ? '–' : records.length.toLocaleString()}
+          </div>
         </div>
       </div>
 
@@ -117,39 +168,23 @@ export default function ScreeningResults() {
             onChange={e => { setSearchId(e.target.value); setPage(0); }}
             style={{ flex: 1, minWidth: 200 }}
           />
-          <select
-            className="filter-select"
-            value={filterDecision}
-            onChange={e => { setFilterDecision(e.target.value); setPage(0); }}
-          >
+          <select className="filter-select" value={filterDecision} onChange={e => { setFilterDecision(e.target.value); setPage(0); }}>
             <option value="">All Decisions</option>
-            {['PASS', 'WATCH', 'REVIEW', 'REJECT'].map(d => <option key={d} value={d}>{d}</option>)}
+            {DECISIONS.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
-          <select
-            className="filter-select"
-            value={filterParam}
-            onChange={e => { setFilterParam(e.target.value); setPage(0); }}
-          >
+          <select className="filter-select" value={filterParam} onChange={e => { setFilterParam(e.target.value); setPage(0); }}>
             <option value="">All Parameters</option>
-            {params.map(p => <option key={p} value={p}>{p.replace('_', ' ')}</option>)}
+            {params.map(p => <option key={p} value={p}>{p.replace(/_/g, ' ')}</option>)}
           </select>
-          <select
-            className="filter-select"
-            value={filterDrift}
-            onChange={e => { setFilterDrift(e.target.value); setPage(0); }}
-          >
+          <select className="filter-select" value={filterDrift} onChange={e => { setFilterDrift(e.target.value); setPage(0); }}>
             <option value="">All Drift Risk</option>
             {['SAFE', 'WATCH', 'DANGEROUS'].map(d => <option key={d} value={d}>{d}</option>)}
           </select>
           <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
             {filtered.length.toLocaleString()} results
           </span>
-          {(filterDecision || filterParam || filterDrift || searchId) && (
-            <button
-              className="btn btn-ghost"
-              style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-              onClick={() => { setFilterDecision(''); setFilterParam(''); setFilterDrift(''); setSearchId(''); setPage(0); }}
-            >
+          {hasFilters && (
+            <button className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={clearFilters}>
               Clear
             </button>
           )}
@@ -181,7 +216,7 @@ export default function ScreeningResults() {
                 {paged.length === 0 ? (
                   <tr>
                     <td colSpan={10} style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-muted)' }}>
-                      No records match the current filter.
+                      {records.length === 0 ? 'No screening results found. Run the pipeline first.' : 'No records match the current filter.'}
                     </td>
                   </tr>
                 ) : (
@@ -193,7 +228,7 @@ export default function ScreeningResults() {
                     >
                       <td className="td-mono" style={{ color: 'var(--color-teal)' }}>{r.component_id}</td>
                       <td className="td-mono" style={{ fontSize: '0.75rem' }}>{r.lot_id}</td>
-                      <td style={{ fontSize: '0.78rem' }}>{r.parameter?.replace('_', ' ')}</td>
+                      <td style={{ fontSize: '0.78rem' }}>{r.parameter?.replace(/_/g, ' ')}</td>
                       <td>
                         <span className={`badge ${r.static_result === 'FAIL' ? 'badge-fail' : 'badge-pass'}`}>
                           {r.static_result}
@@ -201,9 +236,7 @@ export default function ScreeningResults() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                          <div style={{
-                            width: 40, height: 5, background: 'var(--color-border)', borderRadius: 3, overflow: 'hidden'
-                          }}>
+                          <div style={{ width: 40, height: 5, background: 'var(--color-border)', borderRadius: 3, overflow: 'hidden' }}>
                             <div style={{
                               width: `${((r.anomaly_score ?? 0) * 100)}%`,
                               height: '100%',
@@ -230,7 +263,7 @@ export default function ScreeningResults() {
                         {r.label || '–'}
                       </td>
                       <td style={{ maxWidth: 250, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        <span className="truncate" title={r.explanation || ''} style={{ display: 'block', maxWidth: 240 }}>
+                        <span title={r.explanation || ''} style={{ display: 'block', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {r.explanation ? `${r.explanation.slice(0, 80)}…` : '–'}
                         </span>
                       </td>
@@ -243,16 +276,12 @@ export default function ScreeningResults() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
-              <button className="btn btn-ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
-                ← Prev
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+              <button className="btn btn-ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Prev</button>
               <span style={{ padding: '8px 16px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                Page {page + 1} / {totalPages}
+                Page {page + 1} / {totalPages} ({filtered.length.toLocaleString()} records)
               </span>
-              <button className="btn btn-ghost" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
-                Next →
-              </button>
+              <button className="btn btn-ghost" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next →</button>
             </div>
           )}
         </div>

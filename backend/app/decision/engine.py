@@ -32,7 +32,12 @@ def static_check(row: dict[str, Any]) -> str:
 
 
 def compute_safety_margin_pct(row: dict[str, Any]) -> float:
-    val = row.get("value_96h") or row.get("value_24h") or row.get("value_0h", 0)
+    # Use explicit None checks — 0.0 is a valid measurement value and must not be skipped
+    val = (
+        row.get("value_96h") if row.get("value_96h") is not None
+        else row.get("value_24h") if row.get("value_24h") is not None
+        else row.get("value_0h", 0)
+    )
     spec_max = row.get("spec_max", 1)
     if spec_max <= 0:
         return 100.0
@@ -55,10 +60,23 @@ def compute_confidence(row: dict[str, Any]) -> str:
 
 
 def _match_rule(rule: dict[str, Any], context: dict[str, Any]) -> bool:
+    """Match rule conditions. Supports exact equality and range operators (lt, gt, lte, gte)."""
     conditions = rule.get("conditions", {})
     for key, expected in conditions.items():
-        if context.get(key) != expected:
-            return False
+        val = context.get(key)
+        if isinstance(expected, dict):
+            # Range condition: {lt: 5.0}, {gt: 80.0}, etc.
+            if "lt" in expected and not (val is not None and val < expected["lt"]):
+                return False
+            if "lte" in expected and not (val is not None and val <= expected["lte"]):
+                return False
+            if "gt" in expected and not (val is not None and val > expected["gt"]):
+                return False
+            if "gte" in expected and not (val is not None and val >= expected["gte"]):
+                return False
+        else:
+            if val != expected:
+                return False
     return True
 
 

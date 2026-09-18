@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class MeasurementInput(BaseModel):
     component_id: str
     lot_id: str
-    parameter: str
+    parameter: Literal["iddq", "leakage_current", "propagation_delay"]
     value_0h: float
     value_24h: float | None = None
     value_96h: float | None = None
@@ -19,9 +19,19 @@ class MeasurementInput(BaseModel):
     spec_max: float
     temperature_profile: str = "125C"
 
+    @model_validator(mode="after")
+    def check_spec_range(self):
+        if self.spec_min >= self.spec_max:
+            raise ValueError(f"spec_min ({self.spec_min}) must be less than spec_max ({self.spec_max})")
+        return self
+
 
 class PredictRequest(BaseModel):
     measurements: list[MeasurementInput]
+
+
+# ScreenRequest is an alias for PredictRequest
+ScreenRequest = PredictRequest
 
 
 class AnomalyResult(BaseModel):
@@ -30,7 +40,9 @@ class AnomalyResult(BaseModel):
     anomaly_score: float
     anomaly_label: bool
     severity: str
-    contributing_features: list[str]
+    xgb_score: float = 0.0
+    xgb_triggered: bool = False
+    contributing_features: list[str] = Field(default_factory=list)
 
 
 class DriftResult(BaseModel):
@@ -63,10 +75,6 @@ class ComponentPrediction(BaseModel):
 
 class PredictResponse(BaseModel):
     results: list[ComponentPrediction]
-
-
-class ScreenRequest(BaseModel):
-    measurements: list[MeasurementInput]
 
 
 class HealthResponse(BaseModel):

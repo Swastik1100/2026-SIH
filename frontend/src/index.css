@@ -674,3 +674,15 @@ select.filter-select:focus {
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .page-content { padding: var(--space-4); }
 }
+
+/* Accessibility: respect user's reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

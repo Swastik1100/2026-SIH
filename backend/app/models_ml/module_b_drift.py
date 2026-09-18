@@ -17,7 +17,7 @@ import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, cross_validate
 
 try:
     from xgboost import XGBRegressor
@@ -86,7 +86,7 @@ class ModuleBDriftPredictor:
 
     def select_and_train(self, df: pd.DataFrame, train_ids: set[str]) -> dict[str, Any]:
         train_df, _ = self._prepare_data(df, train_ids)
-        candidates = self.config["module_b"]["candidate_models"]
+        candidates = list(self.config["module_b"]["candidate_models"])  # copy — do not mutate config
         # Skip xgboost_regressor if not available
         if not _XGB_AVAILABLE and "xgboost_regressor" in candidates:
             candidates = [c for c in candidates if c != "xgboost_regressor"]
@@ -110,14 +110,15 @@ class ModuleBDriftPredictor:
             for model_name in candidates:
                 try:
                     model = _get_model(model_name, self.config)
-                    scores = cross_val_score(
-                        model, X, y, cv=cv_folds, scoring="neg_mean_absolute_error"
+                    cv_result = cross_validate(
+                        model, X, y, cv=cv_folds,
+                        scoring={
+                            "mae": "neg_mean_absolute_error",
+                            "rmse": "neg_root_mean_squared_error",
+                        },
                     )
-                    mae = -scores.mean()
-                    rmse_scores = cross_val_score(
-                        model, X, y, cv=cv_folds, scoring="neg_root_mean_squared_error"
-                    )
-                    rmse = -rmse_scores.mean()
+                    mae = float(-cv_result["test_mae"].mean())
+                    rmse = float(-cv_result["test_rmse"].mean())
                     param_results[model_name] = {"mae": round(mae, 6), "rmse": round(rmse, 6)}
                     if mae < best_mae:
                         best_mae = mae

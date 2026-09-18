@@ -22,7 +22,11 @@ import argparse
 import logging
 import subprocess
 import sys
+import warnings
 from pathlib import Path
+
+# Suppress noisy sklearn/joblib parallel compatibility warning
+warnings.filterwarnings("ignore", message=".*sklearn.utils.parallel.delayed.*")
 
 # Set root to project repo root
 REPO_ROOT = Path(__file__).resolve().parent

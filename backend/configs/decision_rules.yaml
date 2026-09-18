@@ -1,5 +1,6 @@
 # Transparent decision rules — editable without code changes
 # Inputs: static_result, anomaly_severity, drift_risk, safety_margin_pct, confidence
+# Range conditions supported: {lt: value}, {gt: value}, {lte: value}, {gte: value}
 
 rules:
   - name: "Static fail → REJECT"
@@ -27,8 +28,17 @@ rules:
     decision: "REVIEW"
     reason: "High anomaly with elevated drift — requires QA review."
 
-  - name: "Medium anomaly + dangerous drift → REVIEW"
+  - name: "High anomaly + safe drift → REVIEW"
     priority: 4
+    conditions:
+      static_result: "PASS"
+      anomaly_severity: "HIGH"
+      drift_risk: "SAFE"
+    decision: "REVIEW"
+    reason: "High population anomaly despite safe drift — requires QA review."
+
+  - name: "Medium anomaly + dangerous drift → REVIEW"
+    priority: 5
     conditions:
       static_result: "PASS"
       anomaly_severity: "MEDIUM"
@@ -36,8 +46,17 @@ rules:
     decision: "REVIEW"
     reason: "Moderate anomaly combined with dangerous drift trajectory."
 
+  - name: "Medium anomaly + watch drift → WATCH"
+    priority: 6
+    conditions:
+      static_result: "PASS"
+      anomaly_severity: "MEDIUM"
+      drift_risk: "WATCH"
+    decision: "WATCH"
+    reason: "Moderate anomaly with elevated but not dangerous drift — monitor closely."
+
   - name: "Medium anomaly only → WATCH"
-    priority: 5
+    priority: 7
     conditions:
       static_result: "PASS"
       anomaly_severity: "MEDIUM"
@@ -46,7 +65,7 @@ rules:
     reason: "Moderate dynamic anomaly detected; monitor closely."
 
   - name: "Dangerous drift only → REVIEW"
-    priority: 6
+    priority: 8
     conditions:
       static_result: "PASS"
       anomaly_severity: "LOW"
@@ -55,7 +74,7 @@ rules:
     reason: "Predicted drift exceeds safety slope despite low anomaly score."
 
   - name: "Watch drift only → WATCH"
-    priority: 7
+    priority: 9
     conditions:
       static_result: "PASS"
       anomaly_severity: "LOW"

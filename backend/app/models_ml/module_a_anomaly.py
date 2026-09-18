@@ -217,7 +217,6 @@ class ModuleAAnomalyDetector:
                 scale_pos_weight=spw,
                 subsample=0.8,
                 colsample_bytree=0.8,
-                use_label_encoder=False,
                 eval_metric="logloss",
                 random_state=42,
                 n_jobs=-1,
@@ -248,7 +247,6 @@ class ModuleAAnomalyDetector:
                     scale_pos_weight=spw_global,
                     subsample=0.8,
                     colsample_bytree=0.8,
-                    use_label_encoder=False,
                     eval_metric="logloss",
                     random_state=42,
                     n_jobs=-1,
@@ -294,7 +292,8 @@ class ModuleAAnomalyDetector:
             score = -self.global_models[row["parameter"]].score_samples(X)[0]
         else:
             return 0.0
-        return float(min(max(score / 0.5, 0.0), 1.0))
+        if_scale = self.config.get("isolation_forest_score_scale", 0.5)
+        return float(min(max(score / if_scale, 0.0), 1.0))
 
     def _xgb_score(self, row: pd.Series) -> float:
         """Return XGBoost defect probability [0, 1]."""

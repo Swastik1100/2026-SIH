@@ -50,6 +50,8 @@ def predict(request: PredictRequest):
 @router.post("/anomaly")
 def anomaly_only(request: PredictRequest):
     pipeline = get_pipeline()
+    if not pipeline._trained:
+        raise HTTPException(status_code=503, detail="Models not trained. Run pipeline first.")
     df = _measurements_to_df(request.measurements)
     featured = engineer_features(df, compute_lot_stats(df))
     scores = pipeline.module_a.score_dataframe(featured)
@@ -59,6 +61,8 @@ def anomaly_only(request: PredictRequest):
 @router.post("/drift")
 def drift_only(request: PredictRequest):
     pipeline = get_pipeline()
+    if not pipeline._trained:
+        raise HTTPException(status_code=503, detail="Models not trained. Run pipeline first.")
     df = _measurements_to_df(request.measurements)
     featured = engineer_features(df, compute_lot_stats(df))
     preds = pipeline.module_b.predict(featured)
@@ -80,7 +84,6 @@ def screen_batch(request: ScreenRequest, db: Session = Depends(get_db)):
 
 @router.get("/component/{component_id}", response_model=ComponentDetail)
 def get_component(component_id: str, db: Session = Depends(get_db)):
-    init_db()
     records = db.query(ScreeningResult).filter(ScreeningResult.component_id == component_id).all()
     if not records:
         raise HTTPException(status_code=404, detail="Component not found")
@@ -120,7 +123,6 @@ def get_component(component_id: str, db: Session = Depends(get_db)):
 
 @router.get("/lot/{lot_id}", response_model=LotSummary)
 def get_lot(lot_id: str, db: Session = Depends(get_db)):
-    init_db()
     records = db.query(ScreeningResult).filter(ScreeningResult.lot_id == lot_id).all()
     if not records:
         raise HTTPException(status_code=404, detail="Lot not found")
@@ -162,39 +164,71 @@ def get_metrics():
 
 
 @router.get("/screening-results")
-def list_screening_results(db: Session = Depends(get_db)):
-    init_db()
-    records = db.query(ScreeningResult).order_by(ScreeningResult.id.desc()).limit(500).all()
-    return [
-        {
-            "component_id": r.component_id,
-            "lot_id": r.lot_id,
-            "parameter": r.parameter,
-            "static_result": r.static_result,
-            "anomaly_score": r.anomaly_score,
-            "predicted_168h": r.predicted_168h,
-            "drift_risk": r.drift_risk,
-            "final_decision": r.final_decision,
-            "explanation": r.explanation[:200] + "..." if len(r.explanation or "") > 200 else r.explanation,
-            "label": r.label,
-        }
-        for r in records
-    ]
+def list_screening_results(
+    page: int = 1,
+    page_size: int = 100,
+    decision: str | None = None,
+    db: Session = Depends(get_db),
+):
+    from sqlalchemy import func as sqlfunc
+
+    page_size = min(page_size, 500)  # Hard cap
+    offset = (page - 1) * page_size
+
+    query = db.query(ScreeningResult)
+    if decision:
+        query = query.filter(ScreeningResult.final_decision == decision.upper())
+
+    total = query.with_entities(sqlfunc.count(ScreeningResult.id)).scalar() or 0
+    records = query.order_by(ScreeningResult.id.desc()).offset(offset).limit(page_size).all()
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "records": [
+            {
+                "component_id": r.component_id,
+                "lot_id": r.lot_id,
+                "parameter": r.parameter,
+                "static_result": r.static_result,
+                "anomaly_score": r.anomaly_score,
+                "predicted_168h": r.predicted_168h,
+                "drift_risk": r.drift_risk,
+                "final_decision": r.final_decision,
+                "explanation": r.explanation[:200] + "..." if len(r.explanation or "") > 200 else r.explanation,
+                "label": r.label,
+            }
+            for r in records
+        ],
+    }
 
 
 @router.get("/dashboard-stats")
 def dashboard_stats(db: Session = Depends(get_db)):
-    init_db()
-    records = db.query(ScreeningResult).all()
-    if not records:
-        return {"total": 0, "decisions": {}, "anomaly_rate": 0}
+    from sqlalchemy import func as sqlfunc
 
-    decisions = {}
-    for r in records:
-        d = r.final_decision or "UNKNOWN"
-        decisions[d] = decisions.get(d, 0) + 1
+    total_records = db.query(sqlfunc.count(ScreeningResult.id)).scalar() or 0
+    if total_records == 0:
+        return {"total": 0, "decisions": {}, "anomaly_rate": 0, "total_components": 0, "total_records": 0, "escaped_defects_prevented": 0}
 
-    anomalous = sum(1 for r in records if r.anomaly_severity in ("MEDIUM", "HIGH"))
+    # Aggregate queries — no full table scan
+    decision_rows = (
+        db.query(ScreeningResult.final_decision, sqlfunc.count(ScreeningResult.id))
+        .group_by(ScreeningResult.final_decision)
+        .all()
+    )
+    decisions = {(d or "UNKNOWN"): cnt for d, cnt in decision_rows}
+
+    total_components = db.query(sqlfunc.count(sqlfunc.distinct(ScreeningResult.component_id))).scalar() or 0
+
+    anomalous = (
+        db.query(sqlfunc.count(ScreeningResult.id))
+        .filter(ScreeningResult.anomaly_severity.in_(["MEDIUM", "HIGH"]))
+        .scalar()
+        or 0
+    )
+
     report_path = Path(__file__).resolve().parents[2] / "data" / "processed" / "evaluation_report.json"
     escaped_prevented = 0
     if report_path.exists():
@@ -206,9 +240,9 @@ def dashboard_stats(db: Session = Depends(get_db)):
         escaped_prevented = max(0, static_fn - full_fn)
 
     return {
-        "total_components": len({r.component_id for r in records}),
-        "total_records": len(records),
+        "total_components": total_components,
+        "total_records": total_records,
         "decisions": decisions,
-        "anomaly_rate": round(anomalous / len(records) * 100, 2) if records else 0,
+        "anomaly_rate": round(anomalous / total_records * 100, 2),
         "escaped_defects_prevented": escaped_prevented,
     }

@@ -1,74 +1,74 @@
 {
   "iddq": {
     "linear_regression": {
-      "mae": 0.310518,
-      "rmse": 0.532869
+      "mae": 0.296347,
+      "rmse": 0.528961
     },
     "ridge": {
-      "mae": 0.3704,
-      "rmse": 0.614134
+      "mae": 0.301644,
+      "rmse": 0.527932
     },
     "random_forest": {
-      "mae": 0.247966,
-      "rmse": 0.489856
+      "mae": 0.245299,
+      "rmse": 0.473312
     },
     "xgboost_regressor": {
-      "mae": 0.264875,
-      "rmse": 0.510157
+      "mae": 0.253614,
+      "rmse": 0.486808
     },
     "gradient_boosting": {
-      "mae": 0.270737,
-      "rmse": 0.519567
+      "mae": 0.250566,
+      "rmse": 0.492801
     },
     "selected": "random_forest",
-    "selected_mae": 0.247966
+    "selected_mae": 0.245299
   },
   "leakage_current": {
     "linear_regression": {
-      "mae": 3.728014,
-      "rmse": 6.544115
+      "mae": 3.246717,
+      "rmse": 6.244754
     },
     "ridge": {
-      "mae": 3.502206,
-      "rmse": 6.504963
+      "mae": 3.247526,
+      "rmse": 6.186437
     },
     "random_forest": {
-      "mae": 3.244241,
-      "rmse": 6.223153
+      "mae": 3.079324,
+      "rmse": 6.038946
     },
     "xgboost_regressor": {
-      "mae": 3.495778,
-      "rmse": 6.538866
+      "mae": 3.255934,
+      "rmse": 6.243285
     },
     "gradient_boosting": {
-      "mae": 3.539337,
-      "rmse": 6.922715
+      "mae": 3.462956,
+      "rmse": 6.727667
     },
     "selected": "random_forest",
-    "selected_mae": 3.244241
+    "selected_mae": 3.079324
   },
   "propagation_delay": {
     "linear_regression": {
-      "mae": 0.98009,
-      "rmse": 1.592071
+      "mae": 0.990139,
+      "rmse": 1.588754
     },
     "ridge": {
-      "mae": 0.923985,
-      "rmse": 1.52646
+      "mae": 0.932176,
+      "rmse": 1.513803
     },
     "random_forest": {
-      "mae": 0.707613,
-      "rmse": 1.311906
+      "mae": 0.71196,
+      "rmse": 1.319089
     },
     "xgboost_regressor": {
-      "mae": 0.803151,
-      "rmse": 1.389282
+      "mae": 0.772059,
+      "rmse": 1.383684
     },
     "gradient_boosting": {
-      "mae": 0.814488,
-      "rmse": 1.451716
+      "mae": 0.838368,
+      "rmse": 1.469188
     },
     "selected": "random_forest",
-    "selected_mae": 0.707613
+    "selected_mae": 0.71196
   }
 }

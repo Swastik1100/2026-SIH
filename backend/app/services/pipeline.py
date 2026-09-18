@@ -144,10 +144,13 @@ class ScreeningPipeline:
         if not self._trained:
             self.load_models()
 
-        train_ids, _, _ = self.split_ids(df) if "label" in df.columns else (set(), set(), set())
+        # In inference mode (no labels), use all training data for lot stats
+        train_ids: set[str] | None = None
+        if "label" in df.columns:
+            train_ids, _, _ = self.split_ids(df)
         lot_stats = compute_lot_stats(
-            self.featured_df if self.featured_df is not None and train_ids else df,
-            train_ids if train_ids else None,
+            self.featured_df if self.featured_df is not None else df,
+            train_ids,  # None means use all data — correct for inference
         )
         # For new lots (demo), add batch-computed stats
         batch_stats = compute_lot_stats(df, use_batch_for_unknown_lots=True)
@@ -160,33 +163,62 @@ class ScreeningPipeline:
         return results
 
     def _persist_results(self, results: list[dict[str, Any]]) -> None:
+        """Persist results with upsert — re-running pipeline overwrites existing records."""
         init_db()
         Session = get_session_factory()
         session = Session()
         try:
             for r in results:
-                rec = ScreeningResult(
-                    component_id=r["component_id"],
-                    lot_id=r["lot_id"],
-                    parameter=r["parameter"],
-                    value_0h=r["measurements"].get("value_0h"),
-                    value_24h=r["measurements"].get("value_24h"),
-                    value_96h=r["measurements"].get("value_96h"),
-                    value_168h=r["measurements"].get("value_168h"),
-                    spec_min=r.get("spec_min"),
-                    spec_max=r.get("spec_max"),
-                    static_result=r["decision"]["static_result"],
-                    anomaly_score=r["anomaly"]["anomaly_score"],
-                    anomaly_severity=r["anomaly"]["severity"],
-                    predicted_168h=r["drift"].get("predicted_168h"),
-                    drift_risk=r["drift"].get("drift_risk"),
-                    drift_rate=r["drift"].get("drift_rate"),
-                    final_decision=r["decision"]["decision"],
-                    explanation=r["explanation"],
-                    label=r.get("label"),
+                # Upsert: update existing record if (component_id, parameter) already exists
+                existing = (
+                    session.query(ScreeningResult)
+                    .filter_by(component_id=r["component_id"], parameter=r["parameter"])
+                    .first()
                 )
-                session.add(rec)
+                if existing:
+                    # Update in-place
+                    existing.lot_id = r["lot_id"]
+                    existing.value_0h = r["measurements"].get("value_0h")
+                    existing.value_24h = r["measurements"].get("value_24h")
+                    existing.value_96h = r["measurements"].get("value_96h")
+                    existing.value_168h = r["measurements"].get("value_168h")
+                    existing.spec_min = r.get("spec_min")
+                    existing.spec_max = r.get("spec_max")
+                    existing.static_result = r["decision"]["static_result"]
+                    existing.anomaly_score = r["anomaly"]["anomaly_score"]
+                    existing.anomaly_severity = r["anomaly"]["severity"]
+                    existing.predicted_168h = r["drift"].get("predicted_168h")
+                    existing.drift_risk = r["drift"].get("drift_risk")
+                    existing.drift_rate = r["drift"].get("drift_rate")
+                    existing.final_decision = r["decision"]["decision"]
+                    existing.explanation = r["explanation"]
+                    existing.label = r.get("label")
+                else:
+                    rec = ScreeningResult(
+                        component_id=r["component_id"],
+                        lot_id=r["lot_id"],
+                        parameter=r["parameter"],
+                        value_0h=r["measurements"].get("value_0h"),
+                        value_24h=r["measurements"].get("value_24h"),
+                        value_96h=r["measurements"].get("value_96h"),
+                        value_168h=r["measurements"].get("value_168h"),
+                        spec_min=r.get("spec_min"),
+                        spec_max=r.get("spec_max"),
+                        static_result=r["decision"]["static_result"],
+                        anomaly_score=r["anomaly"]["anomaly_score"],
+                        anomaly_severity=r["anomaly"]["severity"],
+                        predicted_168h=r["drift"].get("predicted_168h"),
+                        drift_risk=r["drift"].get("drift_risk"),
+                        drift_rate=r["drift"].get("drift_rate"),
+                        final_decision=r["decision"]["decision"],
+                        explanation=r["explanation"],
+                        label=r.get("label"),
+                    )
+                    session.add(rec)
             session.commit()
+        except Exception:
+            session.rollback()
+            raise
         finally:
             session.close()
 
