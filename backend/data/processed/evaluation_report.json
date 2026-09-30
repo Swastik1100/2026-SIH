@@ -19,19 +19,19 @@
   },
   "module_b": {
     "leakage_current": {
-      "mae": 3.272936,
-      "rmse": 5.807225,
-      "r2": 0.732091
+      "mae": 3.276653,
+      "rmse": 5.813867,
+      "r2": 0.731478
     },
     "iddq": {
-      "mae": 0.230534,
-      "rmse": 0.476942,
-      "r2": 0.725833
+      "mae": 0.231078,
+      "rmse": 0.476938,
+      "r2": 0.725837
     },
     "propagation_delay": {
-      "mae": 0.606782,
-      "rmse": 1.290174,
-      "r2": 0.749848
+      "mae": 0.606681,
+      "rmse": 1.290098,
+      "r2": 0.749877
     },
     "model_selection": {
       "iddq": {
@@ -44,19 +44,19 @@
           "rmse": 0.527932
         },
         "random_forest": {
-          "mae": 0.245299,
-          "rmse": 0.473312
+          "mae": 0.245461,
+          "rmse": 0.472961
         },
         "xgboost_regressor": {
           "mae": 0.253614,
           "rmse": 0.486808
         },
         "gradient_boosting": {
-          "mae": 0.250566,
-          "rmse": 0.492801
+          "mae": 0.250716,
+          "rmse": 0.492803
         },
         "selected": "random_forest",
-        "selected_mae": 0.245299
+        "selected_mae": 0.245461
       },
       "leakage_current": {
         "linear_regression": {
@@ -68,19 +68,19 @@
           "rmse": 6.186437
         },
         "random_forest": {
-          "mae": 3.079324,
-          "rmse": 6.038946
+          "mae": 3.076273,
+          "rmse": 6.035539
         },
         "xgboost_regressor": {
           "mae": 3.255934,
           "rmse": 6.243285
         },
         "gradient_boosting": {
-          "mae": 3.462956,
-          "rmse": 6.727667
+          "mae": 3.45359,
+          "rmse": 6.737756
         },
         "selected": "random_forest",
-        "selected_mae": 3.079324
+        "selected_mae": 3.076273
       },
       "propagation_delay": {
         "linear_regression": {
@@ -92,19 +92,19 @@
           "rmse": 1.513803
         },
         "random_forest": {
-          "mae": 0.71196,
-          "rmse": 1.319089
+          "mae": 0.712209,
+          "rmse": 1.318687
         },
         "xgboost_regressor": {
           "mae": 0.772059,
           "rmse": 1.383684
         },
         "gradient_boosting": {
-          "mae": 0.838368,
-          "rmse": 1.469188
+          "mae": 0.837479,
+          "rmse": 1.468016
         },
         "selected": "random_forest",
-        "selected_mae": 0.71196
+        "selected_mae": 0.712209
       }
     }
   },
@@ -112,7 +112,7 @@
     "latent_defects_caught": 36,
     "latent_defects_total": 36,
     "latent_capture_rate": 1.0,
-    "healthy_false_positives": 179,
+    "healthy_false_positives": 180,
     "test_components": 167
   },
   "baseline_comparison": {
@@ -141,7 +141,7 @@
       "latent_defects_detected": 36,
       "latent_defects_total": 36,
       "false_negatives": 12,
-      "false_positives": 179,
+      "false_positives": 180,
       "escaped_defects": 12,
       "total_defects": 110,
       "detection_rate": 0.8909
